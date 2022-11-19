@@ -14,6 +14,7 @@ func DWebp(src, dst, pattern string) {
 		dwebp_help(src, dst, file, pattern, index+1, len(files))
 	}
 }
+
 func dwebp_help(src, dst, file, pattern string, index, total int) {
 	in := strings.Join([]string{src, file}, "/")
 	extname := path.Ext(file)
@@ -64,4 +65,45 @@ func getFiles(dir, pattern string) []string {
 		}
 	}
 	return aim
+}
+
+func DWebM2Gif(src, dst, pattern string) {
+	files := getFiles(src, "webm")
+	for index, file := range files {
+		dwebm_help(src, dst, file, pattern, index+1, len(files))
+	}
+}
+func dwebm_help(src, dst, file, pattern string, index, total int) {
+	in := strings.Join([]string{src, file}, "/")
+	extname := path.Ext(file)
+	filename := strings.Trim(file, extname)
+	out := strings.Join([]string{dst, strings.Join([]string{filename, pattern}, ".")}, "/")
+	cmd := exec.Command("ffmpeg", "-i", in, out)
+	log.Debug.Printf("开始处理文件%s\t生成的命令是:%s", file, cmd)
+	// 命令的错误输出和标准输出都连接到同一个管道
+	stdout, err := cmd.StdoutPipe()
+	cmd.Stderr = cmd.Stdout
+	if err != nil {
+		log.Debug.Printf("cmd.StdoutPipe产生的错误:%v", err)
+	}
+	if err = cmd.Start(); err != nil {
+		log.Debug.Printf("cmd.Run产生的错误:%v", err)
+	}
+	// 从管道中实时获取输出并打印到终端
+	for {
+		tmp := make([]byte, 1024)
+		_, err := stdout.Read(tmp)
+		//写成输出日志
+		log.Info.Printf("正在处理第 %d/%d 个文件: %s\n", index+1, total, file)
+		t := string(tmp)
+		t = strings.Replace(t, "\u0000", "", -1)
+		log.Info.Println(t)
+		if err != nil {
+			break
+		}
+	}
+	if err = cmd.Wait(); err != nil {
+		log.Debug.Println("命令执行中有错误产生", err)
+	}
+	log.Debug.Printf("完成当前文件的处理:源文件是%s\t目标文件是%s\n", in, out)
 }
